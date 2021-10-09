@@ -1,14 +1,4 @@
-package config
-
-/* NOTE: This is a super simple parser, don't expect any
-fancy features */
-
-import (
-	"os"
-	"bufio"
-	"strings"
-	"fmt"
-)
+/* Super simple INI-style parser */
 
 /*
 #comment
@@ -17,6 +7,15 @@ import (
 accept=addr
 connect=addr
 */
+
+package config
+
+import (
+	"os"
+	"bufio"
+	"strings"
+	"fmt"
+)
 
 /* lines starting with either of these characters are treated
 as comments */
