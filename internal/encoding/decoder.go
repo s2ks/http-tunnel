@@ -1,4 +1,4 @@
-package decoder
+package encoding
 
 import "encoding/base64"
 
