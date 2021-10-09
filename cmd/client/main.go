@@ -1,4 +1,4 @@
-package client
+package main
 
 import (
 	"net"
@@ -8,8 +8,8 @@ import (
 	"encoding/base64"
 	"strings"
 
-	"http-tunnel/commmon/config"
-	"http-tunnel/common/encoding"
+	"github.com/s2ks/http-tunnel/internal/config"
+	"github.com/s2ks/http-tunnel/internal/encoding"
 )
 
 
