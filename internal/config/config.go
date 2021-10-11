@@ -15,6 +15,7 @@ import (
 	"bufio"
 	"strings"
 	"fmt"
+	"log"
 )
 
 /* lines starting with either of these characters are treated
@@ -48,28 +49,27 @@ func IsSection(line string) (bool) {
 	}
 }
 
+/* A section has the form of [section name] */
 func ParseSection(line string, r *bufio.Reader) (string, error) {
 	if line[0] != '[' {
 		return "", fmt.Errorf("Not a section")
 	}
 
-	for i := 0; i < len(line); i++ {
-		err := r.UnreadByte()
-
-		if err != nil {
-			return "", err
-		}
-	}
-
 	section_name := ""
 
-	if strings.Contains(line, "]") == false {
-		section_name = line
+	for i := 1; i < len(line); i++ {
+		if line[i] == ']' {
+			log.Print(section_name)
+			return section_name, nil
+		}
+
+		section_name += string(line[i])
 	}
 
 	section_part, err := r.ReadString(']')
+	section_part = strings.TrimSuffix(section_part, "]")
 
-	if err == nil {
+	if err != nil {
 		return "", err
 	}
 
@@ -85,22 +85,42 @@ func Parse(cfg_file *os.File) (Config, error) {
 	section_name := "__global"
 	config_map[section_name] = new(Section)
 
-	for line, err := reader.ReadString('\n'); (err == nil && line != ""); {
-		line = strings.Trim(line, " \t") /* Trim whitespace */
+	var err error
 
-		if len(line) == 0 {
-			continue
+	for {
+		line, err := reader.ReadString('\n')
+
+		if err != nil {
+			break
 		}
-		if IsComment(line) {
-			continue /* skip */
-		}
-		if IsSection(line) {
-			section_name, err = ParseSection(line, reader)
-			/* TODO Append a new Section to the Config map */
+
+		line = strings.Trim(line, " \t") /* Trim whitespace */
+		log.Print(line)
+
+		switch line[0] {
+			/* section */
+			case '[':
+				section_name, err = ParseSection(line, reader)
+
+				if err != nil {
+					return nil, err
+				}
+
+				config_map[section_name] = new(Section)
+				break
+			/* comment */
+			case ';':
+			case '#':
+				break
+			default:
+				/* Parse key=val */
+
 		}
 	}
 
-	return nil, nil
+	log.Print(config_map)
+
+	return config_map, err
 }
 
 //func (c Config) GetSection(section string) *Section {}

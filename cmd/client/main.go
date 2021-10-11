@@ -83,6 +83,10 @@ func Handle(conn net.Conn) {
 func main() {
 	flag.Parse()
 
+	//if *config_file_option == "" {
+		//log.Fatal("Please provide a config file")
+	//}
+
 	listener, err := net.Listen(*protocol_option, *accept_option)
 
 	if err != nil {
