@@ -18,12 +18,6 @@ import (
 	"log"
 )
 
-/* lines starting with either of these characters are treated
-as comments */
-var (
-	comment_char = []byte{';', '#'}
-)
-
 type Config map[string]*Section
 
 type Section struct {
@@ -31,51 +25,35 @@ type Section struct {
 	Connect string
 }
 
-func IsComment(line string) (bool) {
-	for _, c := range comment_char {
-		if line[0] == c {
-			return true
-		}
-	}
-
-	return false
+type Line struct {
+	body 	string
+	no 	int
 }
 
-func IsSection(line string) (bool) {
-	if line[0] == '[' {
-		return true
-	} else {
-		return false
-	}
+func ParseKeyVal(line Line, s *Section) {
+	key := ""
+	val := ""
+
+	/* key=val */
+
+	/* ... TODO */
 }
 
 /* A section has the form of [section name] */
-func ParseSection(line string, r *bufio.Reader) (string, error) {
-	if line[0] != '[' {
-		return "", fmt.Errorf("Not a section")
-	}
-
+func ParseSection(line Line, r *bufio.Reader) (string, error) {
 	section_name := ""
 
-	for i := 1; i < len(line); i++ {
+	/* Assume the caller has made sure that line[0] == '[' */
+	for i := 1; i < len(line.body); i++ {
 		if line[i] == ']' {
-			log.Print(section_name)
 			return section_name, nil
 		}
 
-		section_name += string(line[i])
+		section_name += string(line.body[i])
 	}
 
-	section_part, err := r.ReadString(']')
-	section_part = strings.TrimSuffix(section_part, "]")
-
-	if err != nil {
-		return "", err
-	}
-
-	section_name = strings.Join([]string{section_name, section_part}, "")
-
-	return section_name, nil
+	return section_name, fmt.Errorf("Mission closing bracket ']' in section on line
+	\n%d: %s", line.no, line.body)
 }
 
 func Parse(cfg_file *os.File) (Config, error) {
@@ -86,21 +64,24 @@ func Parse(cfg_file *os.File) (Config, error) {
 	config_map[section_name] = new(Section)
 
 	var err error
+	var line Line
+
+	line.no = 0
 
 	for {
-		line, err := reader.ReadString('\n')
+		line.body, err := reader.ReadString('\n')
+		line.no++
 
-		if err != nil {
+		if line == "" && err != nil {
 			break
 		}
 
-		line = strings.Trim(line, " \t") /* Trim whitespace */
-		log.Print(line)
+		line.body = strings.Trim(line.body, " \t\r") /* Trim whitespace */
 
-		switch line[0] {
+		switch line.body[0] {
 			/* section */
 			case '[':
-				section_name, err = ParseSection(line, reader)
+				section_name, err = ParseSection(line.body, reader)
 
 				if err != nil {
 					return nil, err
@@ -111,16 +92,18 @@ func Parse(cfg_file *os.File) (Config, error) {
 			/* comment */
 			case ';':
 			case '#':
-				break
+				break /* ignore */
 			default:
 				/* Parse key=val */
+				err = ParseKeyVal(line.body, config_map[section_name])
 
+				if err != nil {
+					return nil, err
+				}
 		}
 	}
 
-	log.Print(config_map)
-
-	return config_map, err
+	return config_map, nil
 }
 
 //func (c Config) GetSection(section string) *Section {}
