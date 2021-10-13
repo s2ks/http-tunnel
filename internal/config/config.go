@@ -52,7 +52,7 @@ func ParseSection(line Line, r *bufio.Reader) (string, error) {
 		section_name += string(line.body[i])
 	}
 
-	return section_name, fmt.Errorf("Mission closing bracket ']' in section on line
+	return section_name, fmt.Errorf("Missing closing bracket ']' in section on line
 	\n%d: %s", line.no, line.body)
 }
 
