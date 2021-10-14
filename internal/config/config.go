@@ -30,7 +30,7 @@ type Line struct {
 	no 	int
 }
 
-func ParseKeyVal(line Line, s *Section) {
+func ParseKeyVal(line *Line, s *Section) {
 	key := ""
 	val := ""
 
@@ -40,7 +40,7 @@ func ParseKeyVal(line Line, s *Section) {
 }
 
 /* A section has the form of [section name] */
-func ParseSection(line Line, r *bufio.Reader) (string, error) {
+func ParseSection(line *Line) (string, error) {
 	section_name := ""
 
 	/* Assume the caller has made sure that line[0] == '[' */
@@ -52,8 +52,8 @@ func ParseSection(line Line, r *bufio.Reader) (string, error) {
 		section_name += string(line.body[i])
 	}
 
-	return section_name, fmt.Errorf("Missing closing bracket ']' in section on line
-	\n%d: %s", line.no, line.body)
+	return section_name, fmt.Errorf("Missing closing bracket ']' in section on line:
+	\n\t%d: %s", line.no, line.body)
 }
 
 func Parse(cfg_file *os.File) (Config, error) {
@@ -72,7 +72,7 @@ func Parse(cfg_file *os.File) (Config, error) {
 		line.body, err := reader.ReadString('\n')
 		line.no++
 
-		if line == "" && err != nil {
+		if line.body == "" && err != nil {
 			break
 		}
 
@@ -81,7 +81,7 @@ func Parse(cfg_file *os.File) (Config, error) {
 		switch line.body[0] {
 			/* section */
 			case '[':
-				section_name, err = ParseSection(line.body, reader)
+				section_name, err = ParseSection(&line, reader)
 
 				if err != nil {
 					return nil, err
@@ -95,7 +95,7 @@ func Parse(cfg_file *os.File) (Config, error) {
 				break /* ignore */
 			default:
 				/* Parse key=val */
-				err = ParseKeyVal(line.body, config_map[section_name])
+				err = ParseKeyVal(&line, config_map[section_name])
 
 				if err != nil {
 					return nil, err
