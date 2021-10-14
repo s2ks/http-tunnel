@@ -15,28 +15,34 @@ import (
 	"bufio"
 	"strings"
 	"fmt"
-	"log"
+	//"log"
 )
 
-type Config map[string]*Section
-
-type Section struct {
-	Accept string
-	Connect string
-}
+type Config map[string]Section
+type Section map[string][]string
 
 type Line struct {
 	body 	string
 	no 	int
 }
 
-func ParseKeyVal(line *Line, s *Section) {
-	key := ""
-	val := ""
+func ParseKeyVal(line *Line, s Section) error {
+	part := strings.SplitN(line.body, "=", 2)
 
-	/* key=val */
+	if len(part) < 2 {
+		return fmt.Errorf("Malformed expression on line: %d" +
+		"\n\t--> \"%s\"", line.no, line.body)
+	}
 
-	/* ... TODO */
+	key := part[0]
+	val := part[1]
+
+	key = strings.Trim(key, " \t\r")
+	val = strings.Trim(val, " \t\r")
+
+	s[key] = append(s[key], val)
+
+	return nil
 }
 
 /* A section has the form of [section name] */
@@ -45,15 +51,15 @@ func ParseSection(line *Line) (string, error) {
 
 	/* Assume the caller has made sure that line[0] == '[' */
 	for i := 1; i < len(line.body); i++ {
-		if line[i] == ']' {
+		if line.body[i] == ']' {
 			return section_name, nil
 		}
 
 		section_name += string(line.body[i])
 	}
 
-	return section_name, fmt.Errorf("Missing closing bracket ']' in section on line:
-	\n\t%d: %s", line.no, line.body)
+	return section_name, fmt.Errorf("Missing closing bracket ']' " +
+	"in section on line: %d\n\t--> \"%s\"", line.no, line.body)
 }
 
 func Parse(cfg_file *os.File) (Config, error) {
@@ -61,7 +67,7 @@ func Parse(cfg_file *os.File) (Config, error) {
 	config_map := make(Config)
 
 	section_name := "__global"
-	config_map[section_name] = new(Section)
+	config_map[section_name] = make(Section)
 
 	var err error
 	var line Line
@@ -69,26 +75,31 @@ func Parse(cfg_file *os.File) (Config, error) {
 	line.no = 0
 
 	for {
-		line.body, err := reader.ReadString('\n')
+		line.body, err = reader.ReadString('\n')
 		line.no++
 
 		if line.body == "" && err != nil {
 			break
 		}
 
-		line.body = strings.Trim(line.body, " \t\r") /* Trim whitespace */
+		line.body = strings.Trim(line.body, " \t\r\n") /* Trim whitespace */
+
+		if len(line.body) == 0 {
+			continue
+		}
 
 		switch line.body[0] {
 			/* section */
 			case '[':
-				section_name, err = ParseSection(&line, reader)
+				section_name, err = ParseSection(&line)
 
 				if err != nil {
 					return nil, err
 				}
 
-				config_map[section_name] = new(Section)
+				config_map[section_name] = make(Section)
 				break
+			case '\n':
 			/* comment */
 			case ';':
 			case '#':
