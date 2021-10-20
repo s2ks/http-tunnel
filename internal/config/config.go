@@ -116,5 +116,3 @@ func Parse(cfg_file *os.File) (Config, error) {
 
 	return config_map, nil
 }
-
-//func (c Config) GetSection(section string) *Section {}

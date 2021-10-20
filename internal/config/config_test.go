@@ -33,6 +33,9 @@ func TestParse(t *testing.T) {
 	if conf["test_section1"]["this"][0] != "not a comment" {
 		t.Fail()
 	}
+	if len(conf["empty"]) != 0 {
+		t.Fail()
+	}
 
 	t.Log(conf)
 }
