@@ -8,32 +8,25 @@ import (
 	"encoding/base64"
 	"strings"
 
-	//tunnel_config "github.com/s2ks/http-tunnel/internal/config"
+	tunnel_config "github.com/s2ks/http-tunnel/internal/config"
 	tunnel_encoding "github.com/s2ks/http-tunnel/internal/encoding"
 )
 
-
-/* TODO Use a scheme similar to stunnel with both the
-client and the server having accept/connect options
-to specify on what address to accept the connection and
-to what address to send the encoded/decoded packet to. */
-
 var (
-	connect_option 	= flag.String("connect", "", "Address to connect to")
-	protocol_option = flag.String("protocol", "tcp",
-		"Network protocol to use: tcp/tcp4/tcp6/unix/unixpacket")
-	accept_option = flag.String("accept", "localhost:12345",
-		"Address to listen on: [host]:port")
-
 	/* TODO default search path for config file */
 	config_file_option = flag.String("config", "", "Path to a configuration file")
 )
 
-func Handle(conn net.Conn) {
-	buf := make([]byte, 512)
+type Client struct {
+	Listener net.Listener
+	Connect []string
+}
 
+func Handle(conn net.Conn, connect []string) {
 	log.Print(conn.RemoteAddr().String())
 	log.Print(conn.LocalAddr().String())
+
+	buf := make([]byte, 1024)
 
 	for n, err := conn.Read(buf); n > 0; {
 		if err != nil {
@@ -41,18 +34,34 @@ func Handle(conn net.Conn) {
 			return
 		}
 
-		b64data := base64.RawURLEncoding.EncodeToString(buf)
+		b64data := tunnel_encoding.Encode(buf[0:n])
+
+		var resp http.Respone
+		var err error
 
 		/* Send a POST with the base64 encoded original request
-		to the host specified by 'connect_option' */
-		resp, err := http.Post(*connect_option, "text/plain",
-			strings.NewReader(b64data))
+		to the host(s) specified by connect.
+		--
+		Try all hosts specified in connect in order either
+		until one succeeds or we run out of addresses. */
+		for _, addr := range connect {
+			resp, err := http.Post(addr, "text/plain",
+				strings.NewReader(b64data))
 
+			if err != nil {
+				log.Print(err)
+			} else {
+				err = nil
+				break
+			}
+		}
+
+		/* All addresses were tried, and failed */
 		if err != nil {
-			log.Print(err)
 			return
 		}
 
+		/* The response body is empty */
 		if resp.ContentLength == 0 {
 			log.Print("ContentLength = 0; no data")
 			return
@@ -83,23 +92,51 @@ func Handle(conn net.Conn) {
 func main() {
 	flag.Parse()
 
-	//if *config_file_option == "" {
-		//log.Fatal("Please provide a config file")
-	//}
+	if *config_file_option == "" {
+		log.Fatal("Please provide a configuration file")
+	}
 
-	listener, err := net.Listen(*protocol_option, *accept_option)
+	cfg_file, err := os.Open(*config_file_option)
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	cfg_map, err := tunnel_config.Parse(cfg_file)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	clients := make([]Client, 0)
+
+	for name, _ := range cfg_map {
+		accept 	:= cfg_map[name]["accept"]
+		connect := cfg_map[name]["connect"]
+
+		 for _,  addr := range accept {
+			client := new(Client)
+			client.Listener, err = net.Listen("tcp", addr)
+
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			client.Connect = connect
+
+			clients = append(clients, client)
+		 }
+	}
+
 	for {
-		conn, err := listener.Accept()
+		for _, client := range clients {
+			conn, err := client.Listener.Accept()
 
-		if err != nil {
-			log.Fatal(err)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			go Handle(conn, client.Connect)
 		}
-
-		go Handle(conn)
 	}
 }
