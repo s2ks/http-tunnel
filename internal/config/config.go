@@ -37,8 +37,8 @@ func ParseKeyVal(line *Line, s Section) error {
 	key := part[0]
 	val := part[1]
 
-	key = strings.Trim(key, " \t\r")
-	val = strings.Trim(val, " \t\r")
+	key = strings.Trim(key, " \t\r\n")
+	val = strings.Trim(val, " \t\r\n")
 
 	s[key] = append(s[key], val)
 
