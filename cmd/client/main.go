@@ -7,6 +7,7 @@ import (
 	"flag"
 	"strings"
 	"os"
+	"fmt"
 
 	tunnel_config "github.com/s2ks/http-tunnel/internal/config"
 	tunnel_encoding "github.com/s2ks/http-tunnel/internal/encoding"
@@ -18,74 +19,45 @@ var (
 )
 
 type Client struct {
-	Listener net.Listener
-	Connect []string
+	Listener 	net.Listener
+	Url 		string
 }
 
-func Handle(conn net.Conn, connect []string) {
-	log.Print(conn.RemoteAddr().String())
-	log.Print(conn.LocalAddr().String())
-
+func (c *Client) Handle(conn net.Conn) {
 	buf := make([]byte, 1024)
 
 	for n, err := conn.Read(buf); n > 0; {
 		if err != nil {
-			log.Print(err)
-			return
+			log.Fatal(err)
 		}
 
-		b64data := tunnel_encoding.Encode(buf[0:n])
+		/* Base64 encode */
+		b64data := tunnel_encoding.Encode(buf)
 
-		var resp *http.Response
-		var err error
+		/* Send a POST with base64 encoded data from the connection */
+		resp, err := http.Post(c.Url, "text/plain", strings.NewReader(b64data))
 
-		/* Send a POST with the base64 encoded original request
-		to the host(s) specified by connect.
-		--
-		Try all hosts specified in connect in order either
-		until one succeeds or we run out of addresses. */
-		for _, addr := range connect {
-			resp, err = http.Post(addr, "text/plain",
-				strings.NewReader(b64data))
-
-			if err != nil {
-				log.Print(err)
-			} else {
-				err = nil
-				break
-			}
-		}
-
-		/* All addresses were tried, and failed */
 		if err != nil {
-			return
+			log.Fatal(err)
 		}
 
 		/* The response body is empty */
-		if resp.ContentLength == 0 {
-			log.Print("ContentLength = 0; no data")
-			return
+		if resp.ContentLength > 0 {
+			respbuf := make([]byte, resp.ContentLength)
+			_, err := resp.Body.Read(respbuf)
+
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			decoded, err := tunnel_encoding.Decode(respbuf)
+
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			conn.Write(decoded)
 		}
-
-		respbuf := make([]byte, resp.ContentLength)
-		rn, err := resp.Body.Read(respbuf)
-
-		if err != nil {
-			log.Print(err)
-			return
-		}
-
-		if rn == 0 {
-			log.Print("No data")
-			return
-		}
-
-		decoded, err := tunnel_encoding.Decode(respbuf)
-
-		log.Print(decoded)
-
-		/* TODO send the decoded packet back to the remote */
-		//conn.RemoteAddr().String()
 	}
 }
 
@@ -112,9 +84,14 @@ func main() {
 
 	for name, _ := range cfg_map {
 		accept 	:= cfg_map[name]["accept"]
-		connect := cfg_map[name]["connect"]
+		url 	:= cfg_map[name]["url"]
 
-		 for _,  addr := range accept {
+		if len(url) == 0 {
+			log.Fatal(fmt.Errorf("No url option specified in configuration" +
+				"file"))
+		}
+
+		for _,  addr := range accept {
 			client := new(Client)
 			client.Listener, err = net.Listen("tcp", addr)
 
@@ -122,21 +99,21 @@ func main() {
 				log.Fatal(err)
 			}
 
-			client.Connect = connect
+			client.Url = url[0]
 
 			clients = append(clients, client)
-		 }
+		}
 	}
 
 	for {
-		for _, client := range clients {
-			conn, err := client.Listener.Accept()
+		for _, c := range clients {
+		 	conn, err := c.Listener.Accept()
 
 			if err != nil {
 				log.Fatal(err)
 			}
 
-			go Handle(conn, client.Connect)
+			go c.Handle(conn)
 		}
 	}
 }
