@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"log"
 	"flag"
-	"encoding/base64"
 	"strings"
+	"os"
 
 	tunnel_config "github.com/s2ks/http-tunnel/internal/config"
 	tunnel_encoding "github.com/s2ks/http-tunnel/internal/encoding"
@@ -36,7 +36,7 @@ func Handle(conn net.Conn, connect []string) {
 
 		b64data := tunnel_encoding.Encode(buf[0:n])
 
-		var resp http.Respone
+		var resp *http.Response
 		var err error
 
 		/* Send a POST with the base64 encoded original request
@@ -45,7 +45,7 @@ func Handle(conn net.Conn, connect []string) {
 		Try all hosts specified in connect in order either
 		until one succeeds or we run out of addresses. */
 		for _, addr := range connect {
-			resp, err := http.Post(addr, "text/plain",
+			resp, err = http.Post(addr, "text/plain",
 				strings.NewReader(b64data))
 
 			if err != nil {
@@ -108,7 +108,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	clients := make([]Client, 0)
+	clients := make([]*Client, 0)
 
 	for name, _ := range cfg_map {
 		accept 	:= cfg_map[name]["accept"]
