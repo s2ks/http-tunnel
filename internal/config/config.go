@@ -88,6 +88,7 @@ func Parse(cfg_file *os.File) (Config, error) {
 			continue
 		}
 
+		/* Go switch statements don't 'fall thorugh' */
 		switch line.body[0] {
 			/* section */
 			case '[':
@@ -98,12 +99,8 @@ func Parse(cfg_file *os.File) (Config, error) {
 				}
 
 				config_map[section_name] = make(Section)
-				break
-			case '\n':
-			/* comment */
-			case ';':
-			case '#':
-				break /* ignore */
+			/* ignore comments */
+			case ';', '#', '\n':
 			default:
 				/* Parse key=val */
 				err = ParseKeyVal(&line, config_map[section_name])
