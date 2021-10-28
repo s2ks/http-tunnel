@@ -20,11 +20,12 @@ import (
 )
 
 var (
+        /* match whitespace at the start and end of a line */
         whitespace      = regexp.MustCompile(`^[[:space:]]+|[[:space:]]+$`)
 
-        section         = regexp.MustCompile(`^\[(.+)\]$`)
-        comment         = regexp.MustCompile(`^;.*|^#.*`)
-        keyval          = regexp.MustCompile(`(^[^[:space:]]+)=(.*)`)
+        section         = regexp.MustCompile(`^\[(.+)\]$`) /* Match a [section] */
+        comment         = regexp.MustCompile(`^;.*|^#.*`) /* Match ;comment or #comment */
+        keyval          = regexp.MustCompile(`(^.+)=(.*)`) /* Match key=val */
         blankline       = regexp.MustCompile(`^[[:space:]]*$`)
 )
 

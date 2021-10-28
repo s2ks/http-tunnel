@@ -36,6 +36,12 @@ func TestParse(t *testing.T) {
 	if len(conf["empty"]) != 0 {
 		t.Fail()
 	}
+        if conf["not empty"]["keys can have spaces"][0] != "" {
+                t.Fail()
+        }
+        if conf["not empty"]["and don't need"][0] != "a val (default empty)" {
+                t.Fail()
+        }
 
 	t.Log(conf)
 }
