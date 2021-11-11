@@ -25,7 +25,7 @@ var (
 
         section         = regexp.MustCompile(`^\[(.+)\]$`) /* Match a [section] */
         comment         = regexp.MustCompile(`^;.*|^#.*`) /* Match ;comment or #comment */
-        keyval          = regexp.MustCompile(`(^.+)=(.*)`) /* Match key=val */
+        keyval          = regexp.MustCompile(`(^.+?)=(.*)`) /* Match key=val */
         blankline       = regexp.MustCompile(`^[[:space:]]*$`)
 )
 
@@ -91,6 +91,7 @@ func Parse(cfg_file *os.File) (Config, error) {
                 /* Trim whitespace at start and end of line */
                 line.body = whitespace.ReplaceAllString(line.body, "")
 
+                /* NOTE: Golang switch statements don't 'fall through' */
                 switch true {
                         case blankline.MatchString(line.body):
                         case comment.MatchString(line.body):
