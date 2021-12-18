@@ -8,9 +8,11 @@ import (
 	"net/http"
 	"fmt"
 	"sync"
+	"io"
 
 	tunnel_config "github.com/s2ks/http-tunnel/internal/config"
 	tunnel_encoding "github.com/s2ks/http-tunnel/internal/encoding"
+	tunnel_util "github.com/s2ks/http-tunnel/internal/util"
 )
 
 var (
@@ -26,10 +28,12 @@ type TunnelHandler struct {
 	wg 		sync.WaitGroup
 }
 
+/* Write bytes from src to dest */
 func (t *TunnelHandler) forward(src io.Reader, dest io.Writer) {
-	t.wg.Add(1)
 	buf := make([]byte, 0xffff)
 
+	t.wg.Add(1)
+	defer t.wg.Done()
 	for {
 		n, err := src.Read(buf)
 
@@ -45,10 +49,10 @@ func (t *TunnelHandler) forward(src io.Reader, dest io.Writer) {
 			return
 		}
 	}
-	t.wg.Done()
 }
 
-func dialAny(string []addrv) (*net.TCPConn, error) {
+/* Dial any one of the addresses specified in addrv */
+func dialAny(addrv []string) (*net.TCPConn, error) {
 
 	for _, addr := range addrv {
 		tcpaddr, err := net.ResolveTCPAddr("tcp", addr)
@@ -74,7 +78,10 @@ func dialAny(string []addrv) (*net.TCPConn, error) {
 func (t *TunnelHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	found := false
 	for _, path := range t.Paths {
-		found |= (path == r.URL.Path)
+		if path == r.URL.Path {
+			found = true
+			break
+		}
 	}
 
 	if found == false {
@@ -85,15 +92,14 @@ func (t *TunnelHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPost {
 		http.NotFound(w, r)
-		log.Print("Method " + r.Method " will not be handled, we only" +
+		log.Print("Method " + r.Method + " will not be handled, we only" +
 		"handle http POST")
 		return
 	}
 
-	/* Should return a type that implements Read */
-	body_decoder := tunnel_encoding.NewDecoderFromReader(r.Body) /* TODO implement */
-	go t.forward(body_decoder, t.conn)
-	go t.forward(t.conn, w)
+	body_decoder := tunnel_encoding.NewDecoderFromReader(r.Body)
+	go tunnel_util.Forward(body_decoder, t.conn, &t.wg)
+	go tunnel_util.Forward(t.conn, w, &t.wg)
 
 	/* Wait for goroutines to finish */
 	t.wg.Wait()
@@ -119,7 +125,7 @@ func main() {
 	}
 
 	for name, _ := range cfg_map {
-		accept  := cfg_map[name]["accept"][0]
+		accept  := cfg_map[name]["accept"]
 		connect := cfg_map[name]["connect"]
 		paths   := cfg_map[name]["endpoint"]
 
@@ -129,19 +135,21 @@ func main() {
 			log.Fatal(err)
 		}
 
+		tunnel_handler          := new(TunnelHandler)
+		tunnel_handler.Connect  = connect
+		tunnel_handler.Paths    = paths
+		tunnel_handler.Name     = name
+		tunnel_handler.conn 	= conn
+
+		servemux := http.NewServeMux()
+
+		for _, path := range paths {
+			servemux.Handle(path, tunnel_handler)
+		}
+
 		for _, addr := range accept {
-			tunnel_handler          := new(TunnelHandler)
-			tunnel_handler.Connect  = connect
-			tunnel_handler.Paths    = paths
-			tunnel_handler.Name     = name
-			tunnel_handler.conn 	= conn
-
 			go func() {
-				for _, path := range paths {
-					http.Handle(path, tunnel_handler)
-				}
-
-				err := http.ListenAndServe(addr, nil)
+				err := http.ListenAndServe(addr, servemux)
 				if err != nil {
 					log.Fatal(err)
 				}
