@@ -30,14 +30,17 @@ import (
 	"strings"
 	"os"
 	"fmt"
+	//"sync"
 
 	tunnel_config "github.com/s2ks/http-tunnel/internal/config"
 	tunnel_encoding "github.com/s2ks/http-tunnel/internal/encoding"
+	tunnel_util "github.com/s2ks/http-tunnel/internal/util"
 )
 
 var (
 	/* TODO default search path for config file */
 	config_file_option = flag.String("config", "", "Path to a configuration file")
+	client_bufsize = 0xffff
 )
 
 type Client struct {
@@ -50,8 +53,7 @@ func (c *Client) Handle(conn net.Conn) {
 	for maximum body size. The largest the body can be depends on the webserver.
 	For nginx the default is 1MB. */
 
-	/* NOTE: 0xffff is ~64k bytes */
-	buf := make([]byte, 0xffff)
+	buf := make([]byte, client_bufsize)
 
 	for {
 		n, err := conn.Read(buf)
@@ -72,18 +74,8 @@ func (c *Client) Handle(conn net.Conn) {
 			return
 		}
 
-		go func(r *http.Response) {
-			for {
-				n, err :=
-			}
-		}(resp)
-
-		_, err = conn.Write(resp)
-
-		if err != nil {
-			log.Print(err)
-			return
-		}
+		tunnel_util.Forward(resp.Body, conn, nil)
+		resp.Body.Close()
 	}
 }
 
