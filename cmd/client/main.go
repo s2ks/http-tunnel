@@ -124,6 +124,8 @@ func main() {
 		}
 	}
 
+	/* FIXME: for each client start a goroutine that accepts connections
+	for a specific client in a loop, use a WaitGroup for synchronisation */
 	for {
 		for _, c := range clients {
 			conn, err := c.Listener.Accept()
