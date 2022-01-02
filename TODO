@@ -1,0 +1,2 @@
+server: Add support for multiple connections to the same endpoint
+client: Poll for incoming traffic
