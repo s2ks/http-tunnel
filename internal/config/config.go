@@ -114,5 +114,9 @@ func Parse(cfg_file *os.File) (Config, error) {
                 }
         }
 
+	if len(config_map["__global"]) == 0 {
+		delete(config_map, "__global")
+	}
+
         return config_map, nil
 }

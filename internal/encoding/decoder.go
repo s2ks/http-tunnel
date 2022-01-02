@@ -9,24 +9,13 @@ type Decoder struct {
 	r io.Reader
 }
 
-func (d *Decoder) Read(dest []byte) (n int, err error) {
-	buflen := base64.RawURLEncoding.EncodedLen(len(dest))
-	buf := make([]byte, buflen)
-
-	n, err = d.r.Read(buf)
-
-	if err != nil {
-		return
-	}
-
-	n, err = base64.RawURLEncoding.Decode(dest, buf[:n])
-
-	return
+func (d *Decoder) Read(dest []byte) (int, error) {
+	return d.r.Read(dest)
 }
 
 func NewDecoderFromReader(r io.Reader) (*Decoder) {
 	decoder := Decoder{}
-	decoder.r = r
+	decoder.r =  base64.NewDecoder(base64.RawURLEncoding, r)
 
 	return &decoder
 }

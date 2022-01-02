@@ -30,7 +30,7 @@ import (
 	"strings"
 	"os"
 	"fmt"
-	//"sync"
+	"sync"
 
 	tunnel_config "github.com/s2ks/http-tunnel/internal/config"
 	tunnel_encoding "github.com/s2ks/http-tunnel/internal/encoding"
@@ -66,21 +66,32 @@ func (c *Client) Handle(conn net.Conn) {
 		/* Base64 encode */
 		b64data := tunnel_encoding.Encode(buf[:n])
 
+		log.Printf("Handler received [ %s ] --- encoded to [ %s ]\n", string(buf[:n]), b64data)
+
 		/* Send a POST with base64 encoded data from the connection */
-		resp, err := http.Post(c.Url, "text/plain", strings.NewReader(b64data))
+		log.Print("Posting...")
+
+		resp, err := http.Post(c.Url, "http-tunnel/data", strings.NewReader(b64data))
+		log.Print("Post finished.")
 
 		if err != nil {
 			log.Print(err)
 			return
 		}
 
+		log.Print("Forwarding response body...")
+
 		tunnel_util.Forward(resp.Body, conn, nil)
 		resp.Body.Close()
+
+		log.Print("Done forwarding response body.")
 	}
 }
 
 func main() {
 	flag.Parse()
+
+	log.SetPrefix("http-tunnel client: ")
 
 	if *config_file_option == "" {
 		log.Fatal("Please provide a configuration file")
@@ -114,6 +125,8 @@ func main() {
 			client := new(Client)
 			client.Listener, err = net.Listen("tcp", addr)
 
+			log.Printf("http-tunnel client: listening on %s\n", addr)
+
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -124,17 +137,26 @@ func main() {
 		}
 	}
 
-	/* FIXME: for each client start a goroutine that accepts connections
-	for a specific client in a loop, use a WaitGroup for synchronisation */
-	for {
-		for _, c := range clients {
-			conn, err := c.Listener.Accept()
+	var wg sync.WaitGroup
 
-			if err != nil {
-				log.Fatal(err)
+	for _, c := range clients {
+		wg.Add(1)
+		go func() {
+			for {
+				conn, err := c.Listener.Accept()
+
+				log.Printf("Accepted a new connection from %s\n", conn.RemoteAddr().String())
+
+				if err != nil {
+					log.Print(err)
+					continue
+				}
+
+				c.Handle(conn)
 			}
-
-			go c.Handle(conn)
-		}
+			wg.Done()
+		}()
 	}
+
+	wg.Wait()
 }

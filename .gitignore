@@ -1,2 +1,5 @@
 .*
 /bin
+/tests/client
+/tests/server
+/tests/test-remote

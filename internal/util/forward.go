@@ -14,13 +14,14 @@ func Forward(src io.Reader, dest io.Writer, wg *sync.WaitGroup) {
 	buf := make([]byte, ForwarderBuffsize)
 
 	if wg != nil {
-		wg.Add(1)
 		defer wg.Done()
+		defer log.Print("Forwarder done...")
 	}
+
 	for {
 		n, err := src.Read(buf)
 
-		if err != nil {
+		if err != nil && n == 0 {
 			log.Print(err)
 			return
 		}
@@ -29,7 +30,6 @@ func Forward(src io.Reader, dest io.Writer, wg *sync.WaitGroup) {
 
 		if err != nil {
 			log.Print(err)
-			return
 		}
 	}
 }
